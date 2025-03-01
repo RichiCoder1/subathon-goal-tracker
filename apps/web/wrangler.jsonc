@@ -16,7 +16,20 @@
 	},
 	"observability": {
 		"enabled": true
-	}
+	},
+  "vars": {
+    "PARTY_HOST": "localhost:1999",
+    "CALLBACK_OVERRIDE": "api.subathon-goal-tracker.local.richi.dev"
+  },
+  "env": {
+    "production": {
+      "vars": {
+        "PARTY_HOST": "api.richicoder1.partykit.dev",
+        "CALLBACK_OVERRIDE": ""
+      }
+    }
+  },
+  "upload_source_maps": true
   /**
    * Smart Placement
    * Docs: https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement

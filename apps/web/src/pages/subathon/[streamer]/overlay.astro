@@ -1,0 +1,13 @@
+---
+import BareLayout from '../../../layouts/BareLayout.astro';
+import { Overlay as OverlayPage } from "../../../components/subathon/Overlay";
+
+const { env } = Astro.locals.runtime;
+const { streamer } = Astro.params;
+
+export const prerender = false;
+---
+
+<BareLayout>
+    <OverlayPage client:load host={env.PARTY_HOST} room={streamer!}></OverlayPage>
+</BareLayout>

@@ -1,0 +1,41 @@
+---
+import { getSession } from 'auth-astro/server';
+import Layout from '#/layouts/Layout.astro';
+import { SettingsPage } from '#/components/subathon/Settings';
+import { Login } from '#/components/auth/Login';
+import { BroadcasterResponseSchema } from '@subathon-goal-tracker/messages/schema';
+
+const session = await getSession(Astro.request);
+
+const { env } = Astro.locals.runtime;
+const { streamer } = Astro.params;
+
+const host = env.PARTY_HOST;
+const callbackOverride = env.CALLBACK_OVERRIDE == '' ? null : env.CALLBACK_OVERRIDE;
+
+const broadcasterQuery = await fetch(
+    `${host.startsWith('localhost') ? 'http' : 'https'}://${host}/parties/main/${streamer!}?query=broadcaster&login=${streamer!}`
+);
+const response = BroadcasterResponseSchema.parse(await broadcasterQuery.json());
+
+export const prerender = false;
+---
+
+<Layout>
+    {
+        !session ? (
+            <div class="container flex justify-center items-center">
+                <Login client:load />
+            </div>
+        ) : (
+            <SettingsPage
+                client:load
+                host={host}
+                room={streamer!}
+                session={session}
+                broadcasterId={response.broadcasterId}
+                callbackOverride={callbackOverride}
+            />
+        )
+    }</Layout
+>

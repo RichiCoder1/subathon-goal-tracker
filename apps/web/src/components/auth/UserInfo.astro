@@ -1,0 +1,24 @@
+---
+import { Button } from '#/ui/Button';
+import { getSession } from 'auth-astro/server';
+import { LogOutIcon } from "lucide-react";
+
+const session = await getSession(Astro.request);
+---
+
+<div class="flex gap-2 items-center">
+  {session ? (
+    <span>{session?.user?.name}</span>
+    <img class="rounded" width="24" height="24" src={session?.user?.image} />
+    <Button id="logout" variant="icon">
+      <LogOutIcon />
+    </Button>
+  ) : null}
+</div>
+
+<script>
+  const { signOut } = await import("auth-astro/client");
+  document.getElementById("logout")?.addEventListener("click", () => {
+    signOut()
+  });
+</script>

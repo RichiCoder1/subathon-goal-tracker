@@ -1,0 +1,18 @@
+---
+import UserInfo from '#/components/auth/UserInfo.astro';
+import BareLayout from './BareLayout.astro';
+---
+
+<BareLayout>
+    <div class="flex flex-auto flex-col w-lvw min-h-lvh">
+        <header class="flex w-full p-4 border-b-2 border-zinc-600 items-center justify-between dark:bg-zinc-900">
+					<h1 class="mb-0 cursor-default">Subathon Goal Tracker</h1>
+					<div>
+						<UserInfo></UserInfo>
+					</div>
+				</header>
+        <div class="flex grow self-center">
+            <slot />
+        </div>
+    </div>
+</BareLayout>

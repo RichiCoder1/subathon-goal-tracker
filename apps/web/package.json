@@ -1,0 +1,49 @@
+{
+	"name": "web",
+	"type": "module",
+	"version": "0.0.1",
+	"scripts": {
+		"dev": "astro dev",
+		"build": "astro build",
+		"preview": "astro build && wrangler dev",
+		"astro": "astro",
+		"deploy": "astro build && wrangler deploy",
+		"cf-typegen": "wrangler types"
+	},
+	"dependencies": {
+		"@astrojs/cloudflare": "^12.2.2",
+		"@astrojs/react": "^4.2.0",
+		"@auth/core": "^0.37.4",
+		"@subathon-goal-tracker/messages": "workspace:^",
+		"@tailwindcss/vite": "^4.0.9",
+		"@tanstack/react-query": "^5.66.11",
+		"@types/react": "^19.0.10",
+		"@types/react-dom": "^19.0.4",
+		"astro": "^5.3.1",
+		"auth-astro": "^4.2.0",
+		"cookie": "^1.0.2",
+		"dayjs": "^1.11.13",
+		"lucide-react": "^0.476.0",
+		"partysocket": "^1.0.2",
+		"react": "^19.0.0",
+		"react-aria-components": "^1.6.0",
+		"react-dom": "^19.0.0",
+		"react-stately": "^3.35.0",
+		"superjson": "^2.2.2",
+		"tailwind-merge": "^3.0.2",
+		"tailwind-variants": "^0.3.1",
+		"tailwindcss": "^4.0.9",
+		"zod": "^3.24.2"
+	},
+	"devDependencies": {
+		"@cloudflare/workers-types": "^4.20250224.0",
+		"@subathon-goal-tracker/typescript-config": "workspace:*",
+		"typescript": "latest",
+		"wrangler": "^3.110.0"
+	},
+	"imports": {
+		"#/layouts/*": "./src/layouts/*",
+		"#/components/*": "./src/components/*",
+		"#/ui/*": "./src/components/ui/*"
+	}
+}
