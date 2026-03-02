@@ -2,6 +2,7 @@ import Twitch from '@auth/core/providers/twitch'
 import { defineConfig } from 'auth-astro'
 
 export default defineConfig({
+	secret: import.meta.env.AUTH_SECRET,
 	providers: [
 		Twitch({
 			clientId: import.meta.env.TWITCH_CLIENT_ID,

@@ -1,7 +1,7 @@
 {
   "name": "@subathon-goal-tracker/messages",
   "dependencies": {
-    "zod": "^3.24.2"
+    "zod": "^4.3.6"
   },
   "exports": {
     "./schema": "./src/schema.ts"

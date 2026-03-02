@@ -1,7 +1,7 @@
 import z from 'zod';
 
 export const GoalSchema = z.object({
-    id: z.string().uuid(),
+    id: z.uuid(),
     name: z.string(),
     target: z.number().positive(),
 });
@@ -33,6 +33,7 @@ export type Increments = z.output<typeof IncrementsSchema>;
 export const UpdateSubathonSettingsSchema = z.object({
     type: z.literal('subathon.settings.update'),
     goals: z.array(GoalSchema),
+    maxAdditionalSeconds: z.number().nonnegative(),
     incrementValues: TimeIncrementValuesSchema,
 });
 export type UpdateSubathonSettings = z.output<typeof UpdateSubathonSettingsSchema>;
@@ -45,6 +46,7 @@ export const SubathonUpdatedMessageSchema = z.object({
     goals: z.array(GoalSchema),
     incrementValues: TimeIncrementValuesSchema,
     increments: IncrementsSchema,
+    maxAdditionalSeconds: z.number().nonnegative(),
 });
 export type SubathonUpdatedMessage = z.output<typeof SubathonUpdatedMessageSchema>;
 
@@ -80,6 +82,11 @@ export const TickMessageSchema = z.object({
 export const AddTimeMessageSchema = z.object({
     type: z.literal('subathon.time.add'),
     timeInSeconds: z.number(),
+});
+
+export const SetMaxAdditionalSecondsMessageSchema = z.object({
+    type: z.literal('subathon.maxAdditionalSeconds.set'),
+    maxAdditionalSeconds: z.number().nonnegative(),
 });
 
 export const AddGoalMessageSchema = z.object({
@@ -137,6 +144,7 @@ export const ClientMessageSchema = z.union([
     AddTimeMessageSchema,
     AddGoalMessageSchema,
     RemoveGoalMessageSchema,
+    SetMaxAdditionalSecondsMessageSchema,
     GetSubscriptionsSchema,
     SetupSubscriptionsSchema,
     RemoveSubscriptionsSchema,

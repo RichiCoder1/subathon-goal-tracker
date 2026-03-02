@@ -11,14 +11,26 @@
         "baseUrl": ".",
         "jsx": "react-jsx",
         "jsxImportSource": "react",
+        "module": "esnext",
         "moduleResolution": "bundler",
         "types": [
-            "@cloudflare/workers-types/2023-07-01"
+            "@cloudflare/workers-types/latest"
         ],
         "paths": {
-            "#/layouts/*": ["src/layouts/*"],
-            "#/ui/*": ["src/components/ui/*"],
-            "#/components/*": ["src/components/*"],
-        }
+            "#/layouts/*": [
+                "src/layouts/*"
+            ],
+            "#/ui/*": [
+                "src/components/ui/*"
+            ],
+            "#/components/*": [
+                "src/components/*"
+            ],
+        },
+        "plugins": [
+            {
+                "name": "@astrojs/ts-plugin"
+            },
+        ],
     }
 }

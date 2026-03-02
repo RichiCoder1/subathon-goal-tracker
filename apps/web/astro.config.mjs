@@ -16,10 +16,13 @@ export default defineConfig({
   }),
 
   vite: {
-    plugins: [tailwindcss()],
     build: {
       sourcemap: true,
     },
+    ssr: {
+      external: ['node:path']
+    },
+
     resolve: {
       // Use react-dom/server.edge instead of react-dom/server.browser for React 19.
       // Without this, MessageChannel from node:worker_threads needs to be polyfilled.
@@ -27,8 +30,11 @@ export default defineConfig({
         "react-dom/server": "react-dom/server.edge",
       } : {},
     },
+
     server: {
       allowedHosts: ["localhost:4321", "app-subathon-goal-tracker-local.richi.dev"],
-    }
+    },
+
+    plugins: [tailwindcss()]
   }
 });

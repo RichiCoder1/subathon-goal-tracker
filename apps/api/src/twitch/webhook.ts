@@ -91,7 +91,7 @@ async function verifyMessageHmac(message: string, headers: Headers, secret: stri
     );
 }
 
-export function hexBuffer(hex: string): ArrayBuffer {
+export function hexBuffer(hex: string): Uint8Array<ArrayBuffer> {
     const bytes = hex.match(/.{1,2}/g) ?? [];
     return Uint8Array.from(bytes.map((byte) => parseInt(byte, 16)));
 }

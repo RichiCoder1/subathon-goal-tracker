@@ -4,6 +4,7 @@ import Layout from '#/layouts/Layout.astro';
 import { SettingsPage } from '#/components/subathon/Settings';
 import { Login } from '#/components/auth/Login';
 import { BroadcasterResponseSchema } from '@subathon-goal-tracker/messages/schema';
+import { assert } from 'node:console';
 
 const session = await getSession(Astro.request);
 
@@ -13,9 +14,12 @@ const { streamer } = Astro.params;
 const host = env.PARTY_HOST;
 const callbackOverride = env.CALLBACK_OVERRIDE == '' ? null : env.CALLBACK_OVERRIDE;
 
+console.log(`params ${streamer} ${host}`)
+
 const broadcasterQuery = await fetch(
     `${host.startsWith('localhost') ? 'http' : 'https'}://${host}/parties/main/${streamer!}?query=broadcaster&login=${streamer!}`
 );
+assert(broadcasterQuery.status === 200)
 const response = BroadcasterResponseSchema.parse(await broadcasterQuery.json());
 
 export const prerender = false;

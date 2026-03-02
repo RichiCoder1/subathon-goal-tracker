@@ -6,62 +6,52 @@
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "subathon-goal-tracker",
 	"main": "./dist/_worker.js/index.js",
-	"compatibility_date": "2025-02-24",
+	"compatibility_date": "2026-02-25",
 	"compatibility_flags": [
-		"nodejs_compat"
+		"nodejs_compat",
+		"global_fetch_strictly_public"
 	],
 	"assets": {
 		"binding": "ASSETS",
 		"directory": "./dist"
 	},
 	"observability": {
-		"enabled": true
+		"enabled": true,
+		"traces": {
+			"enabled": true
+		}
 	},
-  "vars": {
-    "PARTY_HOST": "localhost:1999",
-    "CALLBACK_OVERRIDE": "api.subathon-goal-tracker.local.richi.dev"
-  },
-  "env": {
-    "production": {
-      "vars": {
-        "PARTY_HOST": "api.richicoder1.partykit.dev",
-        "CALLBACK_OVERRIDE": ""
-      }
-    }
-  },
-  "upload_source_maps": true
-  /**
-   * Smart Placement
-   * Docs: https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
-   */
-  // "placement": { "mode": "smart" },
-
-  /**
-   * Bindings
-   * Bindings allow your Worker to interact with resources on the Cloudflare Developer Platform, including
-   * databases, object storage, AI inference, real-time communication and more.
-   * https://developers.cloudflare.com/workers/runtime-apis/bindings/
-   */
-
-  /**
-   * Environment Variables
-   * https://developers.cloudflare.com/workers/wrangler/configuration/#environment-variables
-   */
-  // "vars": { "MY_VARIABLE": "production_value" },
-  /**
-   * Note: Use secrets to store sensitive data.
-   * https://developers.cloudflare.com/workers/configuration/secrets/
-   */
-
-  /**
-   * Static Assets
-   * https://developers.cloudflare.com/workers/static-assets/binding/
-   */
-  // "assets": { "directory": "./public/", "binding": "ASSETS" },
-
-  /**
-   * Service Bindings (communicate between multiple Workers)
-   * https://developers.cloudflare.com/workers/wrangler/configuration/#service-bindings
-   */
-  // "services": [{ "binding": "MY_SERVICE", "service": "my-service" }]
+	"vars": {
+		"PARTY_HOST": "localhost:1999",
+		"CALLBACK_OVERRIDE": "api.subathon-goal-tracker.local.richi.dev"
+	},
+	"env": {
+		"production": {
+			"routes": [
+				{
+					"pattern": "subathon.puplications.dev",
+					"zone_name": "puplications.dev",
+					"custom_domain": true
+				}
+			],
+			"vars": {
+				"PARTY_HOST": "api.richicoder1.partykit.dev",
+        "TWITCH_CLIENT_ID": "v3b880spptl7hmajqrokqhvywiy8tn",
+				"CALLBACK_OVERRIDE": ""
+			},
+			"observability": {
+				"enabled": true,
+				"traces": {
+					"enabled": true
+				},
+				"logs": {
+					"enabled": true
+				}
+			}
+		}
+	},
+	"upload_source_maps": true,
+	"placement": {
+		"mode": "smart"
+	}
 }
