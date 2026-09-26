@@ -20,6 +20,7 @@ function fixture(extra: Record<string, unknown> = {}) {
     }),
   );
   const broadcasts: any[] = [];
+  const alarms: number[] = [];
   const storage: any = {
     get: async (key: string) => structuredClone(data.get(key)),
     list: async ({ prefix }: { prefix: string }) =>
@@ -38,7 +39,9 @@ function fixture(extra: Record<string, unknown> = {}) {
       for (const key of Array.isArray(keys) ? keys : [keys]) data.delete(key);
     },
     deleteAll: async () => data.clear(),
-    setAlarm: async () => {},
+    setAlarm: async (time: number) => {
+      alarms.push(time);
+    },
     deleteAlarm: async () => {},
     transaction: async (fn: any) => {
       const before = structuredClone(data);
@@ -64,7 +67,7 @@ function fixture(extra: Record<string, unknown> = {}) {
     state: { canEdit: true, expiresAt: now + 3600000 },
     send: (s: string) => broadcasts.push(parse(s)),
   };
-  return { server: new Server(room), data, broadcasts, sender, room };
+  return { server: new Server(room), data, broadcasts, sender, room, alarms };
 }
 function notification(
   type = "channel.subscription.gift",
@@ -154,6 +157,113 @@ test("manual time changes survive a restart", async () => {
   await restarted.onStart();
   assert.equal(restarted.endingAt, end + 60000);
 });
+test("manual additions revive expired timers from now and survive a restart", async () => {
+  const { server, sender, room, broadcasts, alarms } = fixture({
+    endingAt: Date.now() - 600000,
+  });
+  await server.onStart();
+  const requestedAt = Date.now();
+  await server.onMessage(
+    stringify({ type: "subathon.time.add", timeInSeconds: 300 }),
+    sender,
+  );
+  assert.ok(server.endingAt! >= requestedAt + 300000);
+  assert.ok(server.endingAt! <= Date.now() + 300000);
+  assert.equal(server.timeAddedInSeconds, 300);
+  assert.equal(
+    broadcasts.findLast((x) => x.type === "subathon.updated")
+      .remainingTimeInSeconds,
+    300,
+  );
+  assert.equal(alarms.length, 1);
+  const restarted = new Server(room);
+  await restarted.onStart();
+  assert.equal(restarted.endingAt, server.endingAt);
+  assert.equal(restarted.timeAddedInSeconds, 300);
+});
+
+test("reviving a timer still respects the cap and pause state", async () => {
+  const expiredAt = Date.now() - 600000;
+  for (const [earned, applied] of [
+    [72000, 0],
+    [71900, 100],
+  ]) {
+    const { server, sender, alarms } = fixture({
+      endingAt: expiredAt,
+      timeAddedInSeconds: earned,
+    });
+    await server.onStart();
+    await server.onMessage(
+      stringify({ type: "subathon.time.add", timeInSeconds: 300 }),
+      sender,
+    );
+    assert.equal(server.timeAddedInSeconds, earned + applied);
+    assert.equal(alarms.length, applied ? 1 : 0);
+    if (!applied) assert.equal(server.endingAt, expiredAt);
+  }
+  const pausedAt = Date.now() - 300000;
+  const { server, sender, alarms } = fixture({ endingAt: expiredAt, pausedAt });
+  await server.onStart();
+  await server.onMessage(
+    stringify({ type: "subathon.time.add", timeInSeconds: 300 }),
+    sender,
+  );
+  assert.equal(server.pausedAt, pausedAt);
+  assert.equal(server.endingAt, pausedAt + 300000);
+  assert.equal(alarms.length, 0);
+});
+
+test("recovery revives ticking without discarding elapsed time or repeating credits", async () => {
+  const expiredAt = Date.now() - 600000;
+  const { server, sender, alarms, broadcasts } = fixture({
+    endingAt: expiredAt,
+  });
+  await server.onStart();
+  const command = stringify({
+    type: "subathon.recovery.apply",
+    batchId: "revive-finished",
+    note: "Verified timer correction",
+    entries: [],
+    timeAdjustmentSeconds: 900,
+  });
+  await server.onMessage(command, sender);
+  assert.equal(server.endingAt, expiredAt + 900000);
+  assert.equal(server.timeAddedInSeconds, 900);
+  assert.equal(alarms.length, 1);
+  await server.onAlarm();
+  const tick = broadcasts.findLast((x) => x.type === "subathon.tick");
+  assert.ok(
+    tick.remainingTimeInSeconds > 0 && tick.remainingTimeInSeconds <= 300,
+  );
+  assert.equal(alarms.length, 2);
+  await server.onMessage(command, sender);
+  assert.equal(server.endingAt, expiredAt + 900000);
+  assert.equal(server.timeAddedInSeconds, 900);
+});
+
+test("recovery does not start a paused or not-yet-started timer", async () => {
+  for (const timer of [
+    { endingAt: null, pausedAt: null },
+    { endingAt: Date.now() - 600000, pausedAt: Date.now() - 900000 },
+  ]) {
+    const { server, sender, alarms } = fixture(timer);
+    await server.onStart();
+    await server.onMessage(
+      stringify({
+        type: "subathon.recovery.apply",
+        batchId: "stopped-recovery",
+        note: "Verified timer correction",
+        entries: [],
+        timeAdjustmentSeconds: 60,
+      }),
+      sender,
+    );
+    assert.equal(alarms.length, 0);
+    assert.equal(server.pausedAt, timer.pausedAt);
+    if (timer.endingAt === null) assert.equal(server.endingAt, null);
+  }
+});
+
 test("paused overnight contributions still count", async () => {
   const { server } = fixture({
     endingAt: now - 3600000,

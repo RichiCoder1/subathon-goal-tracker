@@ -4,6 +4,9 @@ type Settings = Pick<
   UpdateSubathonSettings,
   "incrementValues" | "maxAdditionalSeconds"
 >;
+type SettingsDraft = Omit<Settings, "maxAdditionalSeconds"> & {
+  maxAdditionalSeconds: number | null;
+};
 export function GeneralSettingsForm({
   value,
   onSubmit,
@@ -15,7 +18,7 @@ export function GeneralSettingsForm({
   disabled: boolean;
   startingSeconds?: number;
 }) {
-  const [draft, setDraft] = useState<Settings | null>(null);
+  const [draft, setDraft] = useState<SettingsDraft | null>(null);
   const current = draft ?? value;
   const saved = JSON.stringify(value);
   useEffect(() => {
@@ -30,7 +33,19 @@ export function GeneralSettingsForm({
     <form
       onSubmit={(event) => {
         event.preventDefault();
-        onSubmit(current);
+        if (current.maxAdditionalSeconds === null) return;
+        if (
+          current.maxAdditionalSeconds === 0 &&
+          value.maxAdditionalSeconds > 0 &&
+          !window.confirm(
+            "Remove the time cap? Future contributions will be able to add unlimited extra time.",
+          )
+        )
+          return;
+        onSubmit({
+          ...current,
+          maxAdditionalSeconds: current.maxAdditionalSeconds,
+        });
       }}
     >
       <p className="muted">
@@ -45,18 +60,25 @@ export function GeneralSettingsForm({
             min="0"
             step="0.25"
             required
-            value={current.maxAdditionalSeconds / 3600}
+            value={
+              current.maxAdditionalSeconds === null
+                ? ""
+                : current.maxAdditionalSeconds / 3600
+            }
             onChange={(e) =>
               setDraft({
                 ...current,
-                maxAdditionalSeconds: Number(e.target.value) * 3600,
+                maxAdditionalSeconds:
+                  e.target.value === "" ? null : e.target.valueAsNumber * 3600,
               })
             }
           />
           <span className="muted">
-            {current.maxAdditionalSeconds
-              ? `${current.maxAdditionalSeconds / 3600} additional + ${startingSeconds / 3600} starting = ${(current.maxAdditionalSeconds + startingSeconds) / 3600} hours total.`
-              : "No additional time cap."}{" "}
+            {current.maxAdditionalSeconds === null
+              ? "Enter the maximum additional hours."
+              : current.maxAdditionalSeconds
+                ? `${current.maxAdditionalSeconds / 3600} additional + ${startingSeconds / 3600} starting = ${(current.maxAdditionalSeconds + startingSeconds) / 3600} hours total.`
+                : "No additional time cap."}{" "}
             Use 0 for no cap.
           </span>
         </label>

@@ -369,7 +369,7 @@ export default class SubathonServer implements Party.Server {
         break;
       }
       case "subathon.time.add": {
-        this.addTime(message.timeInSeconds);
+        this.addTime(message.timeInSeconds, true);
         await this.persistTimer();
         if (
           this.endingAt !== null &&
@@ -404,6 +404,12 @@ export default class SubathonServer implements Party.Server {
       }
       case "subathon.recovery.apply": {
         await this.applyRecovery(message);
+        if (
+          this.endingAt !== null &&
+          this.pausedAt === null &&
+          this.calculateRemainingTime() > 0
+        )
+          await this.room.storage.setAlarm(Date.now() + 1000);
         break;
       }
       case "subathon.twitch.subscriptions.get": {
@@ -506,7 +512,7 @@ export default class SubathonServer implements Party.Server {
           Math.ceil((this.endingAt - (this.pausedAt ?? Date.now())) / 1000),
         );
   }
-  private addTime(seconds: number) {
+  private addTime(seconds: number, reviveExpired = false) {
     const positiveRoom =
       this.maxAdditionalSeconds === 0
         ? Infinity
@@ -520,7 +526,13 @@ export default class SubathonServer implements Party.Server {
         0,
         this.subathonTimeInSeconds + applied,
       );
-    else this.endingAt += applied * 1000;
+    else {
+      // Manual additions revive a finished timer from zero. Historical recovery
+      // still adjusts the original deadline, including time already elapsed.
+      if (reviveExpired && applied > 0)
+        this.endingAt = Math.max(this.endingAt, this.pausedAt ?? Date.now());
+      this.endingAt += applied * 1000;
+    }
     this.timeAddedInSeconds = Math.max(0, this.timeAddedInSeconds + applied);
     return applied;
   }
