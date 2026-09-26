@@ -1,99 +1,126 @@
-import usePartySocket from 'partysocket/react';
-import { useEffect, useState } from 'react';
-import day from 'dayjs';
-import duration from 'dayjs/plugin/duration';
-import './Overlay.css';
-import { type Goal, ServerMessageSchema, type Increments } from '@subathon-goal-tracker/messages/schema';
-import { parse } from 'superjson';
+import usePartySocket from "partysocket/react";
+import { useEffect, useRef, useState } from "react";
+import "./Overlay.css";
+import { ServerMessageSchema } from "@subathon-goal-tracker/messages/schema";
+import { parse } from "superjson";
+import {
+  applyOverlayMessage,
+  remainingOverlaySeconds,
+  overlayNeedsResync,
+  overlayProgress,
+  type OverlaySample,
+} from "./overlay-state";
 
-day.extend(duration);
-
-export const Overlay = (props: { host: string; room: string }) => {
-    const { host, room } = props;
-
-    const [isTimerActive, setTimerActive] = useState(false);
-    const [timeLeft, setTimeLeft] = useState(0);
-    const [increments, setIncrements] = useState<Increments>({
-        tier1: [],
-        tier2: [],
-        tier3: [],
-        bits: [],
-    });
-    const [goals, setGoals] = useState<Goal[]>([]);
-
-    const [showAlert, setShowAlert] = useState(false);
-
-    const ws = usePartySocket({
-        host,
-        room,
-        onMessage(e) {
-            console.log('message', e.data);
-            try {
-                const parsedMessage = parse(e.data);
-                const message = ServerMessageSchema.parse(parsedMessage);
-                switch (message.type) {
-                    case 'subathon.updated':
-                        {
-                            setTimeLeft(message.remainingTimeInSeconds);
-                            setIncrements(message.increments);
-                            setGoals(message.goals);
-                            setTimerActive(message.pausedAt == null);
-                        }
-                        break;
-                    case 'subathon.tick': {
-                        setTimeLeft(message.remainingTimeInSeconds);
-                    }
-                }
-            } catch (e) {
-                console.error(`Failed to parse message`, e);
-            }
-        },
-        onError(e) {
-            console.error('error', e);
-        },
-    });
-
-    const remainingDuration = day.duration(timeLeft, 'seconds');
-
-    const formattedTime = `${Math.floor(remainingDuration.asHours())
-        .toString()
-        .padStart(2, '0')}:${remainingDuration.format('mm:ss')}`;
-
-    let currentSubs =
-        increments.tier1.reduce((current, increment) => current + increment.value, 0) +
-        increments.tier2.reduce((current, increment) => current + increment.value, 0) +
-        increments.tier3.reduce((current, increment) => current + increment.value, 0);
-    let goal = goals.toSorted((a, b) => a.target - b.target).find((goal) => goal.target > currentSubs);
-
-    return (
-        <div className="subathon-screen flex w-screen h-screen bg-[#7edeff] p-2 items-center justify-center">
-            <div id="subathon-container" className="flex flex-col justify-center items-center">
-                {!isTimerActive ? (
-                    <div className="z-10 absolute flex gap-4 items-center justify-center top-0 left-0 bottom-0 right-0">
-                        <div className="-z-10 absolute w-24 h-24 opacity-50 rounded-full bg-zinc-800"></div>
-                        <div className="w-4 h-16 rounded-md border-2 border-black bg-white shadow"></div>
-                        <div className="w-4 h-16 rounded-md border-2 border-black bg-white shadow"></div>
-                    </div>
-                ) : null}
-                <div className="flex flex-1/3 justify-end pb-1 min-h-8 max-w-[300px]">
-                    {showAlert ? <span>Test Alert</span> : null}
-                </div>
-                <div className="relative flex-1/3 font-outline-3 font-outline-black text-5xl tracking-wider text-[#fdff42] w-[7ch] self-center">
-                    {formattedTime}
-                </div>
-                <div className="flex-1/3 pt-1 text-center">
-                    {goal ? (
-                        <span className="font-outline-2 font-outline-black text-white text-[1.8rem] whitespace-break-spaces">
-                            Next Goal:{' '}
-                            <span>
-                                {goal.name}
-                            </span>
-                            <br/>
-                            <span>{'   '}at {goal.target} subs</span>
-                        </span>
-                    ) : null}
-                </div>
-            </div>
+export const Overlay = ({ host, room }: { host: string; room: string }) => {
+  const [sample, setSample] = useState<OverlaySample | null>(null);
+  const sampleRef = useRef<OverlaySample | null>(null);
+  const state = sample?.state ?? null;
+  const [connected, setConnected] = useState(false);
+  const [now, setNow] = useState(0);
+  const socket = usePartySocket({
+    host,
+    room,
+    onOpen() {
+      setConnected(false); // The new connection must receive its full snapshot.
+    },
+    onClose() {
+      setConnected(false);
+    },
+    onError() {
+      setConnected(false);
+    },
+    onMessage(event) {
+      try {
+        const result = ServerMessageSchema.safeParse(parse(event.data));
+        if (!result.success) {
+          setConnected(false);
+          socket.reconnect();
+          return;
+        }
+        const message = result.data;
+        const at = performance.now();
+        const next = applyOverlayMessage(sampleRef.current, message, at);
+        if (next === sampleRef.current) return;
+        sampleRef.current = next;
+        setSample(next);
+        if (message.type === "subathon.updated") setConnected(true);
+        setNow(at);
+      } catch {
+        setConnected(false);
+        socket.reconnect();
+      }
+    },
+  });
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const at = performance.now();
+      setNow(at);
+      if (
+        socket.readyState === WebSocket.OPEN &&
+        overlayNeedsResync(sampleRef.current, at)
+      ) {
+        setConnected(false);
+        socket.reconnect();
+      }
+    }, 250);
+    const resume = () => {
+      if (document.visibilityState === "visible") socket.reconnect();
+    };
+    const online = () => socket.reconnect();
+    document.addEventListener("visibilitychange", resume);
+    window.addEventListener("online", online);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", resume);
+      window.removeEventListener("online", online);
+    };
+  }, [socket]);
+  const seconds = remainingOverlaySeconds(sample, now);
+  const formatted = `${Math.floor(seconds / 3600)
+    .toString()
+    .padStart(2, "0")}:${Math.floor((seconds % 3600) / 60)
+    .toString()
+    .padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
+  const { subs, goal } = overlayProgress(state);
+  return (
+    <div className="subathon-screen flex w-screen h-screen bg-[#7edeff] p-2 items-center justify-center">
+      <div id="subathon-container">
+        <div className="overlay-state">
+          {!state
+            ? "Connecting…"
+            : !connected
+              ? "Reconnecting…"
+              : state.pausedAt !== null
+                ? "Paused"
+                : state.endingAt === null
+                  ? "Ready to start"
+                  : seconds === 0
+                    ? "Time complete"
+                    : ""}
         </div>
-    );
+        <div className="font-outline-3 font-outline-black text-5xl tracking-wider text-[#fdff42] overlay-time">
+          {state ? formatted : "--:--:--"}
+        </div>
+        <div className="font-outline-2 font-outline-black text-white overlay-goal">
+          {goal ? (
+            <>
+              <span>Next goal: {goal.name}</span>
+              <br />
+              <span>
+                {subs.toLocaleString()} / {goal.target.toLocaleString()} subs
+              </span>
+            </>
+          ) : state?.goals.length ? (
+            <>
+              <span>All goals reached!</span>
+              <br />
+              <span>{subs.toLocaleString()} subs</span>
+            </>
+          ) : state ? (
+            <span>{subs.toLocaleString()} subs</span>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
 };

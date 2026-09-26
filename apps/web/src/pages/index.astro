@@ -1,13 +1,41 @@
 ---
-import Welcome from '../components/Welcome.astro';
 import Layout from '../layouts/Layout.astro';
+import '../components/subathon/Settings.css';
 
 export const prerender = false;
 
-// Welcome to Astro! Wondering what to do next? Check out the Astro documentation at https://docs.astro.build
-// Don't want to use any of this? Delete everything in this file, the `assets`, `components`, and `layouts` directories, and start fresh.
+const channel = Astro.url.searchParams.get('channel')?.trim().replace(/^@/,'').toLowerCase();
+if (channel && /^[a-z0-9_]{1,25}$/.test(channel)) return Astro.redirect(`/subathon/${channel}/settings`);
 ---
 
 <Layout>
-	<Welcome />
+  <main class="tracker-settings home-page">
+    <h1>Subathon Goal Tracker</h1>
+    <p class="home-intro">Manage your timer and goals. Keep contributions counted and your audience up to date.</p>
+    <section aria-labelledby="featured-channel">
+      <p class="muted">Featured channel · 7imberwolf</p>
+      <h2 id="featured-channel">Lance’s Spook-athon</h2>
+      <p>Open the controls to manage the stream, or use the overlay as an OBS Browser Source.</p>
+      <div class="button-row">
+        <a class="button" href="/subathon/7imberwolf/settings">Open stream controls</a>
+        <a class="button secondary" href="/subathon/7imberwolf/overlay" target="_blank" rel="noreferrer">Open OBS overlay</a>
+      </div>
+      <p class="muted">Controls require a Twitch sign-in as 7imberwolf or a named editor. The overlay is public.</p>
+    </section>
+    <section aria-labelledby="another-channel">
+      <h2 id="another-channel">Open another channel</h2>
+      <form method="get" class="inline-form">
+        <label>Twitch channel name<input name="channel" required maxlength="25" pattern="[A-Za-z0-9_]{1,25}" autocomplete="off" placeholder="Channel name" /></label>
+        <button type="submit">Open controls</button>
+      </form>
+      {channel !== undefined && <p role="alert" class="tracker-error">Enter a Twitch channel name using letters, numbers, or underscores.</p>}
+      <p class="muted">The broadcaster can manage their own tracker after signing in.</p>
+    </section>
+  </main>
 </Layout>
+<style>
+  .home-page {max-width:52rem;padding-block:3rem}
+  .home-intro {font-size:1.15rem;margin-bottom:2rem}
+  .home-page section:first-of-type {margin-top:2rem}
+  @media(max-width:640px){.home-page{padding-block:2rem}.home-page .button-row{align-items:stretch;flex-direction:column}}
+</style>

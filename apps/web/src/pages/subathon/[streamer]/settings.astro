@@ -1,45 +1,30 @@
 ---
 import { getSession } from 'auth-astro/server';
+import { createAuthConfig } from '../../../../auth.config';
 import Layout from '#/layouts/Layout.astro';
 import { SettingsPage } from '#/components/subathon/Settings';
 import { Login } from '#/components/auth/Login';
 import { BroadcasterResponseSchema } from '@subathon-goal-tracker/messages/schema';
-import { assert } from 'node:console';
-
-const session = await getSession(Astro.request);
-
-const { env } = Astro.locals.runtime;
-const { streamer } = Astro.params;
-
-const host = env.PARTY_HOST;
-const callbackOverride = env.CALLBACK_OVERRIDE == '' ? null : env.CALLBACK_OVERRIDE;
-
-console.log(`params ${streamer} ${host}`)
-
-const broadcasterQuery = await fetch(
-    `${host.startsWith('localhost') ? 'http' : 'https'}://${host}/parties/main/${streamer!}?query=broadcaster&login=${streamer!}`
-);
-assert(broadcasterQuery.status === 200)
-const response = BroadcasterResponseSchema.parse(await broadcasterQuery.json());
-
+import { canEditRoom } from '@subathon-goal-tracker/messages/access';
 export const prerender = false;
+const { env } = Astro.locals.runtime;
+const session = await getSession(Astro.request, createAuthConfig(env));
+const streamer = Astro.params.streamer?.toLowerCase() ?? '';
+if (!/^[a-z0-9_]{1,25}$/.test(streamer)) return new Response('Channel not found', {status:404});
+const allowed = !!session?.user?.name && canEditRoom(streamer,session.user.name.toLowerCase());
+const host = env.PARTY_HOST;
+const callbackOverride = env.CALLBACK_OVERRIDE || null;
+let broadcasterId = '';
+let loadError = '';
+if (allowed) {
+  try {
+    const response = await fetch(`${host.startsWith('localhost') ? 'http' : 'https'}://${host}/parties/main/${streamer}?query=broadcaster`, {signal:AbortSignal.timeout(10000)});
+    if (!response.ok) throw new Error('Broadcaster lookup failed');
+    broadcasterId = BroadcasterResponseSchema.parse(await response.json()).broadcasterId;
+  } catch { loadError = 'The tracker could not reach Twitch. Please reload this page in a moment.'; }
+}
+Astro.response.headers.set('Cache-Control','private, no-store');
 ---
-
 <Layout>
-    {
-        !session ? (
-            <div class="container flex justify-center items-center">
-                <Login client:load />
-            </div>
-        ) : (
-            <SettingsPage
-                client:load
-                host={host}
-                room={streamer!}
-                session={session}
-                broadcasterId={response.broadcasterId}
-                callbackOverride={callbackOverride}
-            />
-        )
-    }</Layout
->
+  {!session ? <div class="p-6"><h1 class="text-2xl mb-4">Sign in to manage {streamer}’s subathon</h1><Login client:load /></div> : !allowed ? <div class="p-6"><h1 class="text-2xl mb-4">Editor access required</h1><p>This tracker is managed by the broadcaster and their named editors.</p><a href={`/subathon/${streamer}/overlay`}>View the overlay</a></div> : loadError ? <p role="alert" class="p-6">{loadError}</p> : <SettingsPage client:load host={host} room={streamer} session={session} broadcasterId={broadcasterId} callbackOverride={callbackOverride} />}
+</Layout>

@@ -8,7 +8,7 @@ import auth from "auth-astro";
 
 // https://astro.build/config
 export default defineConfig({
-  integrations: [react(), auth()],
+  integrations: [react(), auth({injectEndpoints:false})],
   adapter: cloudflare({
     platformProxy: {
       enabled: true

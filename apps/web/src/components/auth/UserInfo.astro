@@ -1,16 +1,17 @@
 ---
 import { Button } from '#/ui/Button';
 import { getSession } from 'auth-astro/server';
+import { createAuthConfig } from '../../../auth.config';
 import { LogOutIcon } from "lucide-react";
 
-const session = await getSession(Astro.request);
+const session = await getSession(Astro.request, createAuthConfig(Astro.locals.runtime.env));
 ---
 
 <div class="flex gap-2 items-center">
   {session ? (
     <span>{session?.user?.name}</span>
-    <img class="rounded" width="24" height="24" src={session?.user?.image} />
-    <Button id="logout" variant="icon">
+    <img class="rounded" width="24" height="24" src={session?.user?.image} alt="" />
+    <Button id="logout" variant="icon" aria-label="Sign out">
       <LogOutIcon />
     </Button>
   ) : null}
