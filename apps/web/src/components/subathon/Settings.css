@@ -151,6 +151,23 @@
 .table-scroll {
   overflow-x: auto;
 }
+.goal-list {
+  max-height: min(28rem, 60svh);
+  overflow-y: auto;
+  scroll-snap-type: y proximity;
+  scroll-padding-top: 3rem;
+  scrollbar-gutter: stable;
+  scrollbar-color: var(--muted) var(--surface);
+}
+.goal-list thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface);
+}
+.goal-list tbody tr {
+  scroll-snap-align: start;
+}
 .tracker-settings table {
   border-collapse: collapse;
   width: 100%;

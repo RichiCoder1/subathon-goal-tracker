@@ -9,6 +9,7 @@ import {
 } from "@subathon-goal-tracker/messages/schema";
 import type { Session } from "@auth/core/types";
 import { GeneralSettingsForm } from "./SettingsForm";
+import { GoalsList } from "./GoalsList";
 import "./Settings.css";
 import { AppearanceForm } from "./AppearanceForm";
 import { SetupSubathonForm } from "./SetupSubathon";
@@ -426,78 +427,15 @@ export function SettingsPage({
             </p>
           </section>
           <section aria-labelledby="goals-heading">
-            <h2 id="goals-heading">
-              Goals <span className="muted">{subs.toLocaleString()} subs</span>
-            </h2>
-            <div className="table-scroll">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Goal</th>
-                    <th>Subs</th>
-                    <th>Status</th>
-                    <th>
-                      <span className="sr-only">Actions</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {state.goals
-                    .toSorted((a, b) => a.target - b.target)
-                    .map((goal) => (
-                      <tr
-                        key={goal.id}
-                        className={
-                          subs >= goal.target
-                            ? "reached-goal"
-                            : goal.id ===
-                                state.goals
-                                  .toSorted((a, b) => a.target - b.target)
-                                  .find((g) => g.target > subs)?.id
-                              ? "next-goal"
-                              : ""
-                        }
-                      >
-                        <td>{goal.name}</td>
-                        <td>{goal.target}</td>
-                        <td>
-                          {subs >= goal.target
-                            ? "Reached"
-                            : `${goal.id === state.goals.toSorted((a, b) => a.target - b.target).find((g) => g.target > subs)?.id ? "Next · " : ""}${goal.target - subs} to go`}
-                        </td>
-                        <td>
-                          <button
-                            className="text-button"
-                            aria-label={`Remove ${goal.name}`}
-                            disabled={disabled}
-                            onClick={() => {
-                              if (
-                                window.confirm(
-                                  `Remove the goal “${goal.name}”?`,
-                                )
-                              )
-                                send({
-                                  type: "subathon.goal.remove",
-                                  id: goal.id,
-                                });
-                            }}
-                          >
-                            Remove
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  {!state.goals.length && (
-                    <tr>
-                      <td colSpan={4}>
-                        Add the first goal below. Contributions are still being
-                        counted.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+            <GoalsList
+              goals={state.goals}
+              subs={subs}
+              disabled={disabled}
+              onRemove={(goal) => {
+                if (window.confirm(`Remove the goal “${goal.name}”?`))
+                  send({ type: "subathon.goal.remove", id: goal.id });
+              }}
+            />
             <form
               ref={goalForm}
               className="inline-form"
