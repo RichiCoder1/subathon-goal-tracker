@@ -22,6 +22,10 @@ export function OverlayDisplay({
     .toString()
     .padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
   const { subs, goal } = overlayProgress(state);
+  const textShadow =
+    appearance.shadowSize > 0
+      ? `0 0 ${appearance.shadowSize}px #000, 0 ${appearance.shadowSize / 3}px ${appearance.shadowSize}px #000`
+      : "none";
   return (
     <div className="subathon-screen">
       <div id="subathon-container" className="subathon-container">
@@ -39,14 +43,22 @@ export function OverlayDisplay({
                     : ""}
         </div>
         <div
-          className="font-outline-3 font-outline-black text-5xl tracking-wider overlay-time"
-          style={{ color: appearance.timerColor }}
+          className="font-outline-black text-5xl tracking-wider overlay-time"
+          style={{
+            color: appearance.timerColor,
+            WebkitTextStrokeWidth: `${appearance.timerOutlineWidth}px`,
+            textShadow,
+          }}
         >
           {state ? formatted : "--:--:--"}
         </div>
         <div
-          className="font-outline-2 font-outline-black overlay-goal"
-          style={{ color: appearance.goalColor }}
+          className="font-outline-black overlay-goal"
+          style={{
+            color: appearance.goalColor,
+            WebkitTextStrokeWidth: `${appearance.goalOutlineWidth}px`,
+            textShadow,
+          }}
         >
           {goal ? (
             <>

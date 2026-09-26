@@ -241,8 +241,12 @@ export default class SubathonServer implements Party.Server {
   ) {
     switch (message.type) {
       case "subathon.appearance.update": {
-        await this.room.storage.put("appearance", message.appearance);
-        this.appearance = message.appearance;
+        const appearance = AppearanceSchema.parse({
+          ...this.appearance,
+          ...message.appearance,
+        });
+        await this.room.storage.put("appearance", appearance);
+        this.appearance = appearance;
         break;
       }
       case "subathon.setup": {

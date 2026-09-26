@@ -483,13 +483,16 @@ test("a delayed event from the old campaign cannot count toward a fresh setup", 
     "before-current-campaign",
   );
 });
-test("overlay colors persist, broadcast to viewers, and reject invalid CSS", async () => {
+test("overlay appearance persists, broadcasts, and validates colors and effects", async () => {
   const { server, sender, room, broadcasts } = fixture();
   await server.onStart();
   const appearance = {
     timerColor: "#ff0000",
     goalColor: "#00ff00",
     previewBackground: "#111111",
+    timerOutlineWidth: 5,
+    goalOutlineWidth: 4.5,
+    shadowSize: 6,
   };
   await server.onMessage(
     stringify({ type: "subathon.appearance.update", appearance }),
@@ -502,6 +505,19 @@ test("overlay colors persist, broadcast to viewers, and reject invalid CSS", asy
   const restarted = new Server(room);
   await restarted.onStart();
   assert.deepEqual(restarted.appearance, appearance);
+  // A page opened before text effects were added must not reset them on save.
+  await server.onMessage(
+    stringify({
+      type: "subathon.appearance.update",
+      appearance: {
+        timerColor: appearance.timerColor,
+        goalColor: appearance.goalColor,
+        previewBackground: appearance.previewBackground,
+      },
+    }),
+    sender,
+  );
+  assert.deepEqual(server.appearance, appearance);
   await server.onMessage(
     stringify({
       type: "subathon.appearance.update",
@@ -511,6 +527,21 @@ test("overlay colors persist, broadcast to viewers, and reject invalid CSS", asy
   );
   assert.equal(broadcasts.at(-1).type, "message.error");
   assert.deepEqual(server.appearance, appearance);
+  for (const invalid of [
+    { timerOutlineWidth: -1 },
+    { goalOutlineWidth: 9 },
+    { shadowSize: 17 },
+  ]) {
+    await server.onMessage(
+      stringify({
+        type: "subathon.appearance.update",
+        appearance: { ...appearance, ...invalid },
+      }),
+      sender,
+    );
+    assert.equal(broadcasts.at(-1).type, "message.error");
+    assert.deepEqual(server.appearance, appearance);
+  }
 });
 test("the upgraded Twitch client adds credentials and resolves Helix paths correctly", async () => {
   const { server, room } = fixture();

@@ -17,15 +17,25 @@ export const TimeIncrementValuesSchema = z.object({
 export type IncrementValues = z.output<typeof TimeIncrementValuesSchema>;
 
 const ColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+const OutlineWidthSchema = z.number().min(0).max(8);
+const ShadowSizeSchema = z.number().min(0).max(16);
 export const AppearanceSchema = z.object({
   timerColor: ColorSchema.default("#fdff42"),
   goalColor: ColorSchema.default("#ffffff"),
   previewBackground: ColorSchema.default("#7edeff"),
+  timerOutlineWidth: OutlineWidthSchema.default(3),
+  goalOutlineWidth: OutlineWidthSchema.default(2),
+  shadowSize: ShadowSizeSchema.default(0),
 });
 export type Appearance = z.output<typeof AppearanceSchema>;
 export const AppearanceUpdateSchema = z.object({
   type: z.literal("subathon.appearance.update"),
-  appearance: AppearanceSchema,
+  // Older settings pages send only colors; preserve any saved text effects.
+  appearance: AppearanceSchema.extend({
+    timerOutlineWidth: OutlineWidthSchema.optional(),
+    goalOutlineWidth: OutlineWidthSchema.optional(),
+    shadowSize: ShadowSizeSchema.optional(),
+  }),
 });
 export const SetupSubathonSchema = z.object({
   type: z.literal("subathon.setup"),

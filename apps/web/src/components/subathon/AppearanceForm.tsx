@@ -55,6 +55,45 @@ export function AppearanceForm({
           </label>
         ))}
       </div>
+      <div className="appearance-fields appearance-effects">
+        {(
+          [
+            ["timerOutlineWidth", "Timer outline", 8],
+            ["goalOutlineWidth", "Goal outline", 8],
+            ["shadowSize", "Text shadow size", 16],
+          ] as const
+        ).map(([key, label, max]) => (
+          <label key={key}>
+            <span>
+              {label}{" "}
+              <span className="muted">
+                {appearance[key] === 0 ? "Off" : `${appearance[key]} px`}
+              </span>
+            </span>
+            <input
+              type="range"
+              min={0}
+              max={max}
+              step={0.5}
+              value={appearance[key]}
+              aria-label={label}
+              aria-valuetext={
+                appearance[key] === 0 ? "Off" : `${appearance[key]} pixels`
+              }
+              onChange={(e) =>
+                setDraft({
+                  ...appearance,
+                  [key]: e.currentTarget.valueAsNumber,
+                })
+              }
+            />
+          </label>
+        ))}
+      </div>
+      <p className="muted">
+        Black outlines and shadows help the timer and goals stand out over your
+        game. Set a slider to 0 to turn that effect off.
+      </p>
       <div
         className="overlay-preview"
         aria-label="Overlay preview"
@@ -68,7 +107,7 @@ export function AppearanceForm({
         />
       </div>
       <div className="button-row">
-        <button disabled={disabled || !draft}>Save overlay colors</button>
+        <button disabled={disabled || !draft}>Save overlay appearance</button>
         <button
           type="button"
           className="secondary"
@@ -82,12 +121,13 @@ export function AppearanceForm({
           className="secondary"
           onClick={() => setDraft(AppearanceSchema.parse({}))}
         >
-          Default colors
+          Default appearance
         </button>
-        {draft && <span className="muted">Previewing unsaved colors</span>}
+        {draft && <span className="muted">Previewing unsaved appearance</span>}
       </div>
       <p className="muted">
-        Saving updates the text colors in OBS automatically.
+        Saving updates the text colors, outlines, and shadows in OBS
+        automatically.
       </p>
     </form>
   );

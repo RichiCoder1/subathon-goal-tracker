@@ -271,7 +271,7 @@ export function SettingsPage({
         <a href="#timer-heading">Timer</a>
         <a href="#goals-heading">Goals</a>
         <a href="#rules-heading">Time rules</a>
-        <a href="#overlay-heading">Overlay colors</a>
+        <a href="#overlay-heading">Overlay appearance</a>
         <a href="#contributions-heading">Contributions</a>
         <a href="#setup-heading" onClick={() => setSetupOpen(true)}>
           Set up / reset
@@ -488,7 +488,7 @@ export function SettingsPage({
             />
           </section>
           <section aria-labelledby="overlay-heading">
-            <h2 id="overlay-heading">Overlay colors</h2>
+            <h2 id="overlay-heading">Overlay appearance</h2>
             <AppearanceForm
               state={state}
               connected={connected}
