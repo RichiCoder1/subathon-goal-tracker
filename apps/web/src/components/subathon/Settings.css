@@ -175,6 +175,74 @@
 .tracker-settings td:not(:first-child) {
   white-space: nowrap;
 }
+.tracker-settings td {
+  vertical-align: middle;
+}
+.settings-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1.3rem;
+  margin-top: 1rem;
+}
+.time-adjust label {
+  flex: 0 1 12rem;
+}
+.time-cap {
+  width: min(100%, 28rem);
+  height: 0.7rem;
+  accent-color: #b45309;
+}
+.reached-goal {
+  color: var(--muted);
+}
+.next-goal {
+  font-weight: 650;
+  background: var(--surface);
+}
+.appearance-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin-block: 1rem;
+}
+.appearance-fields input[type="color"] {
+  width: 5rem;
+  height: 44px;
+  padding: 0.25rem;
+  cursor: pointer;
+}
+.overlay-preview {
+  min-height: 16rem;
+  border-radius: 0.4rem;
+  overflow: hidden;
+  display: grid;
+}
+.setup-goal {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 8rem auto;
+  gap: 0.75rem;
+  align-items: end;
+  margin-block: 1rem;
+}
+.tracker-settings h3 {
+  font-size: 1.1rem;
+  font-weight: 650;
+  margin-top: 1rem;
+}
+.tracker-settings :is(h2, h3) {
+  scroll-margin-top: 1rem;
+}
+@media (max-width: 640px) {
+  .time-adjust label {
+    flex: auto;
+  }
+  .setup-goal {
+    grid-template-columns: minmax(0, 1fr) 6rem;
+  }
+  .setup-goal > label:first-child {
+    grid-column: 1 / -1;
+  }
+}
 .tracker-settings details {
   margin-top: 1rem;
 }

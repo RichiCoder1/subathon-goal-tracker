@@ -8,23 +8,23 @@
         "dist"
     ],
     "compilerOptions": {
-        "baseUrl": ".",
+        
         "jsx": "react-jsx",
         "jsxImportSource": "react",
         "module": "esnext",
         "moduleResolution": "bundler",
         "types": [
-            "@cloudflare/workers-types/latest"
+            "./worker-configuration.d.ts"
         ],
         "paths": {
             "#/layouts/*": [
-                "src/layouts/*"
+                "./src/layouts/*"
             ],
             "#/ui/*": [
-                "src/components/ui/*"
+                "./src/components/ui/*"
             ],
             "#/components/*": [
-                "src/components/*"
+                "./src/components/*"
             ],
         },
         "plugins": [

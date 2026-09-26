@@ -1,5 +1,6 @@
 ---
-import { getSession } from 'auth-astro/server';
+import { getSession } from '../../../auth/server';
+import { env } from 'cloudflare:workers';
 import { createAuthConfig } from '../../../../auth.config';
 import Layout from '#/layouts/Layout.astro';
 import { SettingsPage } from '#/components/subathon/Settings';
@@ -7,7 +8,7 @@ import { Login } from '#/components/auth/Login';
 import { BroadcasterResponseSchema } from '@subathon-goal-tracker/messages/schema';
 import { canEditRoom } from '@subathon-goal-tracker/messages/access';
 export const prerender = false;
-const { env } = Astro.locals.runtime;
+
 const session = await getSession(Astro.request, createAuthConfig(env));
 const streamer = Astro.params.streamer?.toLowerCase() ?? '';
 if (!/^[a-z0-9_]{1,25}$/.test(streamer)) return new Response('Channel not found', {status:404});

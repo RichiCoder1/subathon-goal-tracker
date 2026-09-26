@@ -9,6 +9,7 @@ import {
   type ClientMessage,
   type SubathonUpdatedMessage,
   RecoverySchema,
+  AppearanceSchema,
 } from "@subathon-goal-tracker/messages/schema";
 import { verifyEditorToken } from "@subathon-goal-tracker/messages/access";
 import {
@@ -57,6 +58,9 @@ export default class SubathonServer implements Party.Server {
   timeAddedInSeconds = 0;
   maxAdditionalSeconds = 72000;
   increments = emptyIncrements();
+  appearance = AppearanceSchema.parse({});
+  campaignId = "legacy";
+  private campaignCreatedAt = 0;
   twitchApi: KyInstance;
   static version = "v1.7"; // Existing room data is migrated additively, never cleared on deploy.
   private queue: Promise<unknown> = Promise.resolve();
@@ -74,11 +78,11 @@ export default class SubathonServer implements Party.Server {
 
   constructor(readonly room: Party.Room) {
     this.twitchApi = ky.create({
-      prefixUrl: room.env.TWITCH_BASE_URL as string,
+      prefix: room.env.TWITCH_BASE_URL as string,
       headers: { "Client-Id": room.env.TWITCH_CLIENT_ID as string },
       hooks: {
         beforeRequest: [
-          async (request) => {
+          async ({ request }) => {
             if (!this.token || this.token.expiresAt < Date.now()) {
               const result = TwitchAuthResponseSchema.parse(
                 await ky
@@ -108,6 +112,13 @@ export default class SubathonServer implements Party.Server {
     return task;
   }
   async onStart() {
+    this.appearance = AppearanceSchema.parse(
+      (await this.room.storage.get("appearance")) ?? {},
+    );
+    this.campaignId =
+      (await this.room.storage.get<string>("campaignId")) ?? "legacy";
+    this.campaignCreatedAt =
+      (await this.room.storage.get<number>("campaignCreatedAt")) ?? 0;
     this.subathonTimeInSeconds =
       (await this.room.storage.get<number>("subathonTimeInSeconds")) ?? 14400;
     this.goals = (await this.room.storage.get<Goal[]>("goals")) ?? [];
@@ -150,6 +161,8 @@ export default class SubathonServer implements Party.Server {
       maxAdditionalSeconds: this.maxAdditionalSeconds,
       timeAddedInSeconds: this.timeAddedInSeconds,
       startingTimeInSeconds: this.subathonTimeInSeconds,
+      appearance: this.appearance,
+      campaignId: this.campaignId,
     };
   }
   async onConnect(conn: Party.Connection, ctx: Party.ConnectionContext) {
@@ -227,6 +240,69 @@ export default class SubathonServer implements Party.Server {
     sender: Party.Connection,
   ) {
     switch (message.type) {
+      case "subathon.appearance.update": {
+        await this.room.storage.put("appearance", message.appearance);
+        this.appearance = message.appearance;
+        break;
+      }
+      case "subathon.setup": {
+        // A lost acknowledgement must never cause a second reset.
+        if (await this.room.storage.get(`setup:${message.operationId}`)) break;
+        if (message.expectedCampaignId !== this.campaignId)
+          throw new Error(
+            "Another editor already set up a new subathon. Reload before continuing.",
+          );
+        if (
+          this.endingAt !== null &&
+          this.pausedAt === null &&
+          this.calculateRemainingTime() > 0
+        )
+          throw new Error("Pause the timer before setting up a new subathon.");
+        const archiveId = v7();
+        const campaignCreatedAt = Date.now();
+        const { increments, ...previous } = this.snapshot();
+        await this.room.storage.transaction(async (storage) => {
+          // Archive individually to stay below Durable Object per-value limits.
+          await storage.put(`campaign-archive:${archiveId}`, {
+            ...previous,
+            savedAt: new Date().toISOString(),
+          });
+          for (const [kind, entries] of Object.entries(increments))
+            for (const entry of entries)
+              await storage.put(`archive:${archiveId}:${entry.id}`, {
+                kind,
+                entry,
+              });
+          const keys = await storage.list({ prefix: "contribution:" });
+          const allKeys = [...keys.keys()];
+          for (let i = 0; i < allKeys.length; i += 128)
+            await storage.delete(allKeys.slice(i, i + 128));
+          await storage.delete("increments");
+          await storage.put({
+            campaignId: message.operationId,
+            campaignCreatedAt,
+            subathonTimeInSeconds: message.startingTimeInSeconds,
+            endingAt: null,
+            pausedAt: null,
+            timeAddedInSeconds: 0,
+            maxAdditionalSeconds: message.maxAdditionalSeconds,
+            incrementValues: message.incrementValues,
+            goals: message.goals,
+            [`setup:${message.operationId}`]: archiveId,
+          });
+          await storage.deleteAlarm();
+        });
+        this.campaignId = message.operationId;
+        this.campaignCreatedAt = campaignCreatedAt;
+        this.subathonTimeInSeconds = message.startingTimeInSeconds;
+        this.endingAt = this.pausedAt = null;
+        this.timeAddedInSeconds = 0;
+        this.increments = emptyIncrements();
+        this.goals = message.goals;
+        this.incrementValues = message.incrementValues;
+        this.maxAdditionalSeconds = message.maxAdditionalSeconds;
+        break;
+      }
       case "subathon.settings.update": {
         await this.room.storage.transaction(async (storage) => {
           if (message.goals) await storage.put("goals", message.goals);
@@ -524,6 +600,15 @@ export default class SubathonServer implements Party.Server {
     }
     const receivedAt = new Date().toISOString();
     const occurredAt = req.headers.get(MESSAGE_TIMESTAMP) ?? receivedAt;
+    if (Date.parse(occurredAt) < this.campaignCreatedAt) {
+      await this.room.storage.put(`event:${id}`, {
+        notification,
+        occurredAt,
+        receivedAt,
+        outcome: "before-current-campaign",
+      });
+      return;
+    }
     if (this.endingAt === null || this.calculateRemainingTime() <= 0) {
       await this.room.storage.put(`event:${id}`, {
         notification,

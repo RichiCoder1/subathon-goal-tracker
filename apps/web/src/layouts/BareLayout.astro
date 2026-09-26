@@ -1,5 +1,7 @@
 ---
 import "../styles/global.css";
+interface Props { transparent?: boolean }
+const { transparent = false } = Astro.props;
 ---
 
 <!doctype html>
@@ -11,12 +13,13 @@ import "../styles/global.css";
 		<meta name="generator" content={Astro.generator} />
 		<title>Subathon Goal Tracker</title>
 	</head>
-	<body>
+	<body class:list={{'overlay-body': transparent}}>
 		<slot />
 	</body>
 </html>
 
 <style>
+  .overlay-body { background: transparent !important; }
 	html,
 	body {
 		margin: 0;

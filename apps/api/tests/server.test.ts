@@ -40,7 +40,16 @@ function fixture(extra: Record<string, unknown> = {}) {
     deleteAll: async () => data.clear(),
     setAlarm: async () => {},
     deleteAlarm: async () => {},
-    transaction: async (fn: any) => fn(storage),
+    transaction: async (fn: any) => {
+      const before = structuredClone(data);
+      try {
+        return await fn(storage);
+      } catch (error) {
+        data.clear();
+        for (const [key, value] of before) data.set(key, value);
+        throw error;
+      }
+    },
   };
   const room: any = {
     id: "7imberwolf",
@@ -376,4 +385,168 @@ test("recovering a late start preserves earned time and is safe to retry", async
   await f.server.onMessage(stringify(message), f.sender);
   assert.equal(f.server.endingAt, end - 539191);
   assert.equal(f.server.timeAddedInSeconds, 210);
+});
+
+function setupCommand() {
+  return {
+    type: "subathon.setup",
+    operationId: crypto.randomUUID(),
+    expectedCampaignId: "legacy",
+    startingTimeInSeconds: 7200,
+    maxAdditionalSeconds: 36000,
+    incrementValues: {
+      tier1Seconds: 150,
+      tier2Seconds: 150,
+      tier3Seconds: 150,
+      bitsStep: 100,
+      bitsStepSecond: 60,
+    },
+    goals: [{ id: crypto.randomUUID(), name: "New goal", target: 50 }],
+  };
+}
+test("new setup archives the previous campaign, preserves duplicate protection, and survives restart", async () => {
+  const { server, data, sender, room, broadcasts } = fixture();
+  await server.onStart();
+  await deliver(server, notification(), "original-gift");
+  await server.onMessage(stringify({ type: "subathon.pause" }), sender);
+  const command = setupCommand();
+  await server.onMessage(stringify(command), sender);
+  assert.equal(broadcasts.at(-1).type, "message.ack");
+  assert.equal(server.endingAt, null);
+  assert.equal(server.subathonTimeInSeconds, 7200);
+  assert.equal(server.increments.tier1.length, 0);
+  assert.ok([...data.keys()].some((k) => k.startsWith("campaign-archive:")));
+  assert.ok([...data.values()].some((v) => v?.entry?.id === "original-gift"));
+  assert.ok(data.has("event:original-gift"));
+  const restarted = new Server(room);
+  await restarted.onStart();
+  assert.equal(restarted.campaignId, command.operationId);
+  assert.equal(restarted.goals[0]?.name, "New goal");
+  await restarted.onMessage(stringify({ type: "subathon.start" }), sender);
+  const ending = restarted.endingAt;
+  await restarted.onMessage(stringify(command), sender);
+  assert.equal(
+    restarted.endingAt,
+    ending,
+    "retry after a lost acknowledgement cannot reset the new timer",
+  );
+  await deliver(restarted, notification(), "original-gift");
+  assert.equal(restarted.increments.tier1.length, 0);
+});
+test("setup refuses running timers and stale campaign drafts", async () => {
+  const { server, sender, broadcasts } = fixture();
+  await server.onStart();
+  await server.onMessage(stringify(setupCommand()), sender);
+  assert.match(broadcasts.at(-1).message, /Pause/);
+  assert.equal(server.campaignId, "legacy");
+  await server.onMessage(stringify({ type: "subathon.pause" }), sender);
+  await server.onMessage(
+    stringify({ ...setupCommand(), expectedCampaignId: "stale" }),
+    sender,
+  );
+  assert.match(broadcasts.at(-1).message, /Another editor/);
+  assert.equal(server.campaignId, "legacy");
+});
+test("a failed setup keeps the old timer and contributions intact", async () => {
+  const { server, sender, room, data } = fixture();
+  await server.onStart();
+  await deliver(server, notification(), "kept-gift");
+  await server.onMessage(stringify({ type: "subathon.pause" }), sender);
+  const previous = structuredClone([...data]);
+  const ending = server.endingAt;
+  const put = room.storage.put;
+  room.storage.put = async (key: any, value: any) => {
+    if (typeof key === "object" && key.campaignId)
+      throw new Error("simulated storage failure");
+    return put(key, value);
+  };
+  await server.onMessage(stringify(setupCommand()), sender);
+  assert.deepEqual([...data], previous);
+  assert.equal(server.endingAt, ending);
+  assert.equal(server.increments.tier1[0]?.value, 5);
+});
+test("a delayed event from the old campaign cannot count toward a fresh setup", async () => {
+  const { server, sender, data } = fixture({ endingAt: null });
+  await server.onStart();
+  await server.onMessage(stringify(setupCommand()), sender);
+  await server.onMessage(stringify({ type: "subathon.start" }), sender);
+  const request = new Request("https://example.com/parties/main/7imberwolf", {
+    headers: {
+      "Twitch-Eventsub-Message-Id": "old-delayed",
+      "Twitch-Eventsub-Message-Timestamp": new Date(now - 60000).toISOString(),
+    },
+  });
+  await (server as any).handleTwitchNotification(request, notification());
+  assert.equal(server.increments.tier1.length, 0);
+  assert.equal(
+    data.get("event:old-delayed").outcome,
+    "before-current-campaign",
+  );
+});
+test("overlay colors persist, broadcast to viewers, and reject invalid CSS", async () => {
+  const { server, sender, room, broadcasts } = fixture();
+  await server.onStart();
+  const appearance = {
+    timerColor: "#ff0000",
+    goalColor: "#00ff00",
+    previewBackground: "#111111",
+  };
+  await server.onMessage(
+    stringify({ type: "subathon.appearance.update", appearance }),
+    sender,
+  );
+  assert.deepEqual(
+    broadcasts.findLast((x) => x.type === "subathon.updated").appearance,
+    appearance,
+  );
+  const restarted = new Server(room);
+  await restarted.onStart();
+  assert.deepEqual(restarted.appearance, appearance);
+  await server.onMessage(
+    stringify({
+      type: "subathon.appearance.update",
+      appearance: { ...appearance, timerColor: "url(https://example.com)" },
+    }),
+    sender,
+  );
+  assert.equal(broadcasts.at(-1).type, "message.error");
+  assert.deepEqual(server.appearance, appearance);
+});
+test("the upgraded Twitch client adds credentials and resolves Helix paths correctly", async () => {
+  const { server, room } = fixture();
+  room.env.TWITCH_CLIENT_ID = "client";
+  room.env.TWITCH_CLIENT_SECRET = "secret";
+  const requests: Request[] = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input: any, init: any) => {
+    const request = input instanceof Request ? input : new Request(input, init);
+    requests.push(request);
+    return Response.json(
+      request.url.includes("/oauth2/token")
+        ? { access_token: "test-token", expires_in: 3600, token_type: "bearer" }
+        : {
+            data: [
+              { id: "123", login: "7imberwolf", display_name: "7imberwolf" },
+            ],
+          },
+    );
+  };
+  try {
+    const result = await server.onRequest(
+      new Request(
+        "https://example.com/parties/main/7imberwolf?query=broadcaster",
+      ) as any,
+    );
+    assert.equal(result.status, 200);
+    assert.equal(
+      requests[1]?.url,
+      "https://api.twitch.tv/helix/users?login=7imberwolf",
+    );
+    assert.equal(
+      requests[1]?.headers.get("Authorization"),
+      "Bearer test-token",
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

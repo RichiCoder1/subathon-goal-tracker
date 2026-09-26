@@ -1,13 +1,15 @@
 import usePartySocket from "partysocket/react";
 import { useEffect, useRef, useState } from "react";
-import "./Overlay.css";
-import { ServerMessageSchema } from "@subathon-goal-tracker/messages/schema";
+import { OverlayDisplay } from "./OverlayDisplay";
+import {
+  AppearanceSchema,
+  ServerMessageSchema,
+} from "@subathon-goal-tracker/messages/schema";
 import { parse } from "superjson";
 import {
   applyOverlayMessage,
   remainingOverlaySeconds,
   overlayNeedsResync,
-  overlayProgress,
   type OverlaySample,
 } from "./overlay-state";
 
@@ -76,51 +78,12 @@ export const Overlay = ({ host, room }: { host: string; room: string }) => {
     };
   }, [socket]);
   const seconds = remainingOverlaySeconds(sample, now);
-  const formatted = `${Math.floor(seconds / 3600)
-    .toString()
-    .padStart(2, "0")}:${Math.floor((seconds % 3600) / 60)
-    .toString()
-    .padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
-  const { subs, goal } = overlayProgress(state);
   return (
-    <div className="subathon-screen flex w-screen h-screen bg-[#7edeff] p-2 items-center justify-center">
-      <div id="subathon-container">
-        <div className="overlay-state">
-          {!state
-            ? "Connecting…"
-            : !connected
-              ? "Reconnecting…"
-              : state.pausedAt !== null
-                ? "Paused"
-                : state.endingAt === null
-                  ? "Ready to start"
-                  : seconds === 0
-                    ? "Time complete"
-                    : ""}
-        </div>
-        <div className="font-outline-3 font-outline-black text-5xl tracking-wider text-[#fdff42] overlay-time">
-          {state ? formatted : "--:--:--"}
-        </div>
-        <div className="font-outline-2 font-outline-black text-white overlay-goal">
-          {goal ? (
-            <>
-              <span>Next goal: {goal.name}</span>
-              <br />
-              <span>
-                {subs.toLocaleString()} / {goal.target.toLocaleString()} subs
-              </span>
-            </>
-          ) : state?.goals.length ? (
-            <>
-              <span>All goals reached!</span>
-              <br />
-              <span>{subs.toLocaleString()} subs</span>
-            </>
-          ) : state ? (
-            <span>{subs.toLocaleString()} subs</span>
-          ) : null}
-        </div>
-      </div>
-    </div>
+    <OverlayDisplay
+      state={state}
+      seconds={seconds}
+      connected={connected}
+      appearance={state?.appearance ?? AppearanceSchema.parse({})}
+    />
   );
 };

@@ -1,7 +1,8 @@
 import fs from "node:fs";
 const host = process.argv[2] || "api.richicoder1.partykit.dev";
 const room = process.argv[3] || "7imberwolf";
-const socket = new WebSocket(`wss://${host}/parties/main/${room}`);
+const protocol = /^(localhost|127\.0\.0\.1)(:|$)/.test(host) ? "ws" : "wss";
+const socket = new WebSocket(`${protocol}://${host}/parties/main/${room}`);
 const timeout = setTimeout(() => {
   console.error("No state received.");
   process.exit(1);

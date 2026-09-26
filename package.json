@@ -6,8 +6,14 @@
     "dev": "turbo run dev"
   },
   "devDependencies": {
-    "tsx": "4.21.0",
-    "turbo": "latest"
+    "tsx": "4.23.15",
+    "turbo": "^2.11.4"
   },
-  "packageManager": "pnpm@10.30.2"
+  "packageManager": "pnpm@10.30.2",
+  "pnpm": {
+    "overrides": {
+      "partykit>esbuild": "0.28.2",
+      "miniflare@3>undici": "6.29.0"
+    }
+  }
 }

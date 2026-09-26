@@ -10,6 +10,8 @@ import {
 import type { Session } from "@auth/core/types";
 import { GeneralSettingsForm } from "./SettingsForm";
 import "./Settings.css";
+import { AppearanceForm } from "./AppearanceForm";
+import { SetupSubathonForm } from "./SetupSubathon";
 
 const expectedEvents = [
   "channel.subscribe",
@@ -50,9 +52,8 @@ export function SettingsPage({
   const [subscriptions, setSubscriptions] = useState<any[] | null>(null);
   const [query, setQuery] = useState("");
   const [minutes, setMinutes] = useState("");
-  const [resetConfirmation, setResetConfirmation] = useState<
-    "timer" | "totals" | null
-  >(null);
+  const [setupOpen, setSetupOpen] = useState(false);
+  const [showAllContributors, setShowAllContributors] = useState(false);
   const ws = usePartySocket({
     host,
     room,
@@ -68,7 +69,7 @@ export function SettingsPage({
       return { token: ((await response.json()) as { token: string }).token };
     },
     onOpen() {
-      setConnected(true);
+      setConnected(false);
       setError("");
       setNotice("Connected.");
       ws.send(stringify({ type: "subathon.twitch.subscriptions.get" }));
@@ -103,16 +104,21 @@ export function SettingsPage({
         return;
       }
       const message = result.data;
-      if (message.type === "subathon.updated") setState(message);
+      if (message.type === "subathon.updated") {
+        setState(message);
+        setConnected(true);
+      }
       if (message.type === "subathon.tick")
         setState((current) =>
-          current
+          current &&
+          current.pausedAt === null &&
+          current.endingAt === message.endingAt
             ? {
                 ...current,
                 remainingTimeInSeconds: message.remainingTimeInSeconds,
                 endingAt: message.endingAt,
               }
-            : null,
+            : current,
         );
       if (message.type === "subathon.twitch.subscriptions")
         setSubscriptions(message.subscriptions);
@@ -125,7 +131,12 @@ export function SettingsPage({
         message.type === "message.ack" &&
         message.action === pendingRef.current
       ) {
-        setNotice(message.message);
+        setNotice(
+          message.action === "subathon.setup"
+            ? "New subathon ready. Press Start timer when the stream begins."
+            : message.message,
+        );
+        if (message.action === "subathon.setup") setSetupOpen(false);
         if (message.action === "subathon.time.add") setMinutes("");
         if (message.action === "subathon.goal.add") goalForm.current?.reset();
         setPending(null);
@@ -255,6 +266,16 @@ export function SettingsPage({
           </button>
         </div>
       </header>
+      <nav className="settings-nav" aria-label="Settings sections">
+        <a href="#timer-heading">Timer</a>
+        <a href="#goals-heading">Goals</a>
+        <a href="#rules-heading">Time rules</a>
+        <a href="#overlay-heading">Overlay colors</a>
+        <a href="#contributions-heading">Contributions</a>
+        <a href="#setup-heading" onClick={() => setSetupOpen(true)}>
+          Set up / reset
+        </a>
+      </nav>
       <div
         className={`tracker-status ${!connected ? "connection-warning" : ""}`}
         role="status"
@@ -312,6 +333,14 @@ export function SettingsPage({
                 ? ` · ${duration(Math.max(0, state.maxAdditionalSeconds - state.timeAddedInSeconds))} left before the cap`
                 : " · No cap"}
             </p>
+            {!!state.maxAdditionalSeconds && (
+              <progress
+                className="time-cap"
+                aria-label="Extra time earned toward the cap"
+                value={state.timeAddedInSeconds}
+                max={state.maxAdditionalSeconds}
+              />
+            )}
             {!!state.maxAdditionalSeconds &&
               state.timeAddedInSeconds >= state.maxAdditionalSeconds && (
                 <p>
@@ -346,10 +375,16 @@ export function SettingsPage({
               </button>
             </div>
             {state.endingAt !== null && state.remainingTimeInSeconds === 0 && (
-              <p>Finished. Add time below or use Reset controls.</p>
+              <p>
+                Finished. Add time below or{" "}
+                <a href="#setup-heading" onClick={() => setSetupOpen(true)}>
+                  set up a new subathon
+                </a>
+                .
+              </p>
             )}
             <form
-              className="inline-form"
+              className="inline-form time-adjust"
               onSubmit={(e) => {
                 e.preventDefault();
                 const seconds = Number(minutes) * 60;
@@ -410,13 +445,25 @@ export function SettingsPage({
                   {state.goals
                     .toSorted((a, b) => a.target - b.target)
                     .map((goal) => (
-                      <tr key={goal.id}>
+                      <tr
+                        key={goal.id}
+                        className={
+                          subs >= goal.target
+                            ? "reached-goal"
+                            : goal.id ===
+                                state.goals
+                                  .toSorted((a, b) => a.target - b.target)
+                                  .find((g) => g.target > subs)?.id
+                              ? "next-goal"
+                              : ""
+                        }
+                      >
                         <td>{goal.name}</td>
                         <td>{goal.target}</td>
                         <td>
                           {subs >= goal.target
                             ? "Reached"
-                            : `${goal.target - subs} to go`}
+                            : `${goal.id === state.goals.toSorted((a, b) => a.target - b.target).find((g) => g.target > subs)?.id ? "Next · " : ""}${goal.target - subs} to go`}
                         </td>
                         <td>
                           <button
@@ -488,6 +535,61 @@ export function SettingsPage({
               <button disabled={disabled}>Add goal</button>
             </form>
           </section>
+          <section aria-labelledby="rules-heading">
+            <h2 id="rules-heading">Time rules</h2>
+            <GeneralSettingsForm
+              value={{
+                incrementValues: state.incrementValues,
+                maxAdditionalSeconds: state.maxAdditionalSeconds,
+              }}
+              startingSeconds={state.startingTimeInSeconds}
+              disabled={disabled}
+              onSubmit={(values) =>
+                send({ type: "subathon.settings.update", ...values })
+              }
+            />
+          </section>
+          <section aria-labelledby="overlay-heading">
+            <h2 id="overlay-heading">Overlay colors</h2>
+            <AppearanceForm
+              state={state}
+              connected={connected}
+              disabled={disabled}
+              onSave={(appearance) =>
+                send({ type: "subathon.appearance.update", appearance })
+              }
+            />
+          </section>
+          <section aria-labelledby="twitch-heading">
+            <h2 id="twitch-heading">Twitch connection</h2>
+            <p>
+              {subscriptions === null
+                ? "Checking events…"
+                : `${enabledTypes.length} of ${expectedEvents.length} event types connected.`}
+            </p>
+            <ul className="event-types">
+              {expectedEvents.map((type) => (
+                <li key={type}>
+                  {type.replace("channel.", "").replaceAll(".", " ")}:{" "}
+                  {enabledTypes.includes(type)
+                    ? "Connected"
+                    : "Missing or pending"}
+                </li>
+              ))}
+            </ul>
+            <button
+              disabled={disabled}
+              onClick={() =>
+                send({
+                  type: "subathon.twitch.subscriptions.create",
+                  broadcasterId,
+                  callbackUrl: callback,
+                })
+              }
+            >
+              Repair Twitch connection
+            </button>
+          </section>
           <section aria-labelledby="contributions-heading">
             <div className="section-heading">
               <h2 id="contributions-heading">Contributions</h2>
@@ -519,6 +621,7 @@ export function SettingsPage({
                       item.userName.toLowerCase().includes(query.toLowerCase()),
                     )
                     .sort((a, b) => b.subs - a.subs || b.bits - a.bits)
+                    .slice(0, showAllContributors || query ? undefined : 10)
                     .map((item) => (
                       <tr key={item.userName.toLowerCase()}>
                         <td>{item.userName}</td>
@@ -529,6 +632,20 @@ export function SettingsPage({
                 </tbody>
               </table>
             </div>
+            {totals.size > 10 && !query && (
+              <button
+                className="secondary"
+                onClick={() => setShowAllContributors(!showAllContributors)}
+              >
+                {showAllContributors
+                  ? "Show top 10"
+                  : `Show all ${totals.size} contributors`}
+              </button>
+            )}
+            {!!query &&
+              ![...totals.values()].some((i) =>
+                i.userName.toLowerCase().includes(query.toLowerCase()),
+              ) && <p>No contributors match “{query}”.</p>}
             {!entries.length && (
               <p>
                 No contributions yet. Twitch events will appear here as they
@@ -583,116 +700,35 @@ export function SettingsPage({
               </div>
             </details>
           </section>
-          <section>
-            <h2>Time rules</h2>
-            <GeneralSettingsForm
-              value={{
-                incrementValues: state.incrementValues,
-                maxAdditionalSeconds: state.maxAdditionalSeconds,
-              }}
-              startingSeconds={state.startingTimeInSeconds}
-              disabled={disabled}
-              onSubmit={(values) =>
-                send({ type: "subathon.settings.update", ...values })
-              }
-            />
-          </section>
-          <section>
-            <h2 id="twitch-heading">Twitch connection</h2>
-            <p>
-              {subscriptions === null
-                ? "Checking events…"
-                : `${enabledTypes.length} of ${expectedEvents.length} event types connected.`}
-            </p>
-            <ul className="event-types">
-              {expectedEvents.map((type) => (
-                <li key={type}>
-                  {type.replace("channel.", "").replaceAll(".", " ")}:{" "}
-                  {enabledTypes.includes(type)
-                    ? "Connected"
-                    : "Missing or pending"}
-                </li>
-              ))}
-            </ul>
-            <button
-              disabled={disabled}
-              onClick={() =>
-                send({
-                  type: "subathon.twitch.subscriptions.create",
-                  broadcasterId,
-                  callbackUrl: callback,
-                })
-              }
-            >
-              Repair Twitch connection
-            </button>
-          </section>
-          <details
-            className="reset-section"
-            onToggle={(e) => {
-              if (!e.currentTarget.open) setResetConfirmation(null);
-            }}
-          >
-            <summary>Reset controls</summary>
-            <p>
-              These start a new timer or clear the displayed totals. Use Pause
-              to continue the same subathon tomorrow.
-            </p>
-            <div className="button-row">
-              <button
-                className="secondary"
-                disabled={disabled}
-                onClick={() => setResetConfirmation("timer")}
-              >
-                Reset timer…
-              </button>
-              <button
-                className="secondary"
-                disabled={disabled}
-                onClick={() => setResetConfirmation("totals")}
-              >
-                Clear totals…
-              </button>
-            </div>
-            {resetConfirmation && (
-              <div className="reset-confirmation">
+          <section aria-labelledby="setup-heading">
+            <h2 id="setup-heading">Set up / reset subathon</h2>
+            {!setupOpen ? (
+              <>
                 <p>
-                  {resetConfirmation === "timer"
-                    ? "Reset to four hours and clear earned timer time? A backup file will download first. Contribution totals will remain."
-                    : "Clear all displayed contribution totals? A backup file will download first. The timer will remain."}
+                  Prepare a new event with a fresh timer and goals. Use Pause to
+                  continue the same event tomorrow.
                 </p>
-                <div className="button-row">
-                  <button
-                    className="destructive"
-                    disabled={disabled}
-                    onClick={() => {
-                      download();
-                      send(
-                        resetConfirmation === "timer"
-                          ? {
-                              type: "subathon.reset",
-                              remainingTimeInSeconds: 14400,
-                            }
-                          : { type: "subathon.increments.reset" },
-                      );
-                      setResetConfirmation(null);
-                    }}
-                  >
-                    Confirm{" "}
-                    {resetConfirmation === "timer"
-                      ? "timer reset"
-                      : "clear totals"}
-                  </button>
-                  <button
-                    className="secondary"
-                    onClick={() => setResetConfirmation(null)}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
+                <button
+                  className="secondary"
+                  disabled={disabled}
+                  onClick={() => setSetupOpen(true)}
+                >
+                  Set up a new subathon…
+                </button>
+              </>
+            ) : (
+              <SetupSubathonForm
+                state={state}
+                room={room}
+                disabled={disabled}
+                onCancel={() => setSetupOpen(false)}
+                onSubmit={(command) => {
+                  download();
+                  return send(command);
+                }}
+              />
             )}
-          </details>
+          </section>
         </>
       )}
     </main>

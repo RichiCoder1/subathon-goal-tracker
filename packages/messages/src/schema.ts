@@ -16,6 +16,28 @@ export const TimeIncrementValuesSchema = z.object({
 });
 export type IncrementValues = z.output<typeof TimeIncrementValuesSchema>;
 
+const ColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+export const AppearanceSchema = z.object({
+  timerColor: ColorSchema.default("#fdff42"),
+  goalColor: ColorSchema.default("#ffffff"),
+  previewBackground: ColorSchema.default("#7edeff"),
+});
+export type Appearance = z.output<typeof AppearanceSchema>;
+export const AppearanceUpdateSchema = z.object({
+  type: z.literal("subathon.appearance.update"),
+  appearance: AppearanceSchema,
+});
+export const SetupSubathonSchema = z.object({
+  type: z.literal("subathon.setup"),
+  operationId: z.uuid(),
+  expectedCampaignId: z.string(),
+  startingTimeInSeconds: z.number().int().positive(),
+  maxAdditionalSeconds: z.number().nonnegative(),
+  incrementValues: TimeIncrementValuesSchema,
+  goals: z.array(GoalSchema).max(100),
+});
+export type SetupSubathon = z.output<typeof SetupSubathonSchema>;
+
 export const IncrementTuple = z.object({
   id: z.string(),
   userName: z.string(),
@@ -57,6 +79,8 @@ export const SubathonUpdatedMessageSchema = z.object({
   maxAdditionalSeconds: z.number().nonnegative(),
   timeAddedInSeconds: z.number().default(0),
   startingTimeInSeconds: z.number().default(14400),
+  campaignId: z.string().default("legacy"),
+  appearance: AppearanceSchema.prefault({}),
 });
 export type SubathonUpdatedMessage = z.output<
   typeof SubathonUpdatedMessageSchema
@@ -189,6 +213,8 @@ export const ServerMessageSchema = z.union([
 export type ServerMessage = z.output<typeof ServerMessageSchema>;
 
 export const ClientMessageSchema = z.union([
+  AppearanceUpdateSchema,
+  SetupSubathonSchema,
   UpdateSubathonSettingsSchema,
   SubathonStartMessageSchema,
   SubathonPausedMessageSchema,

@@ -1,10 +1,11 @@
 ---
 import { Button } from '#/ui/Button';
-import { getSession } from 'auth-astro/server';
+import { getSession } from '../../auth/server';
+import { env } from 'cloudflare:workers';
 import { createAuthConfig } from '../../../auth.config';
 import { LogOutIcon } from "lucide-react";
 
-const session = await getSession(Astro.request, createAuthConfig(Astro.locals.runtime.env));
+const session = await getSession(Astro.request, createAuthConfig(env));
 ---
 
 <div class="flex gap-2 items-center">
@@ -18,8 +19,8 @@ const session = await getSession(Astro.request, createAuthConfig(Astro.locals.ru
 </div>
 
 <script>
-  const { signOut } = await import("auth-astro/client");
+  const { authenticate } = await import('../../auth/client');
   document.getElementById("logout")?.addEventListener("click", () => {
-    signOut()
+    authenticate('signout').catch(() => window.alert('Could not sign out. Please try again.'));
   });
 </script>

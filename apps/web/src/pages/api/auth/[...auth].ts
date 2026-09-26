@@ -1,7 +1,8 @@
 import type { APIRoute } from 'astro';
-import { AstroAuth } from 'auth-astro/server';
+import { Auth } from '@auth/core';
+import { env } from 'cloudflare:workers';
 import { createAuthConfig } from '../../../../auth.config';
 
 export const prerender = false;
-export const GET: APIRoute = async context => await AstroAuth(createAuthConfig(context.locals.runtime.env)).GET(context) ?? new Response('Not found',{status:404});
-export const POST: APIRoute = async context => await AstroAuth(createAuthConfig(context.locals.runtime.env)).POST(context) ?? new Response('Not found',{status:404});
+export const GET: APIRoute = ({request}) => Auth(request, createAuthConfig(env));
+export const POST = GET;
