@@ -5,15 +5,15 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "subathon-goal-tracker",
-	"main": "./dist/_worker.js/index.js",
-	"compatibility_date": "2026-02-25",
+	"main": "@astrojs/cloudflare/entrypoints/server",
+	"compatibility_date": "2026-09-26",
 	"compatibility_flags": [
 		"nodejs_compat",
 		"global_fetch_strictly_public"
 	],
 	"assets": {
 		"binding": "ASSETS",
-		"directory": "./dist"
+		"directory": "./dist/client"
 	},
 	"observability": {
 		"enabled": true,

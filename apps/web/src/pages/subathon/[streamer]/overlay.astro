@@ -2,12 +2,13 @@
 import BareLayout from '../../../layouts/BareLayout.astro';
 import { Overlay as OverlayPage } from "../../../components/subathon/Overlay";
 
-const { env } = Astro.locals.runtime;
-const { streamer } = Astro.params;
+import { env } from 'cloudflare:workers';
+const streamer = Astro.params.streamer?.toLowerCase() ?? '';
+if (!/^[a-z0-9_]{1,25}$/.test(streamer)) return new Response('Channel not found', {status:404});
 
 export const prerender = false;
 ---
 
-<BareLayout>
+<BareLayout transparent>
     <OverlayPage client:load host={env.PARTY_HOST} room={streamer!}></OverlayPage>
 </BareLayout>

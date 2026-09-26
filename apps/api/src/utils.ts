@@ -5,8 +5,8 @@ export function parseMessage(message: string) {
   let parsedMessage: object | null;
   try {
     parsedMessage = parse(message);
-  } catch (e) {
-    throw new Error("Failed to parse message.", { cause: e });
+  } catch {
+    parsedMessage = null;
   }
 
   return ClientMessageSchema.safeParse(parsedMessage);

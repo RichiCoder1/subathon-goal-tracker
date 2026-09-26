@@ -1,6 +1,11 @@
 # build output
 dist/
 
+# Local recovery evidence and tool caches
+.recovery/
+.cache/
+.pnpm-store/
+
 # generated types
 .astro/
 
